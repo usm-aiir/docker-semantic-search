@@ -2,14 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { listCollections, createCollection, deleteCollection } from "../api";
 
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-  );
-}
-
 function PlusIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -116,40 +108,31 @@ export default function Home() {
             {collections.map((name) => (
               <li
                 key={name}
-                className="flex items-center gap-2 px-4 py-3 bg-white border border-slate-200 rounded-md hover:border-slate-300"
+                className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg transition-all"
               >
-                <span className="flex-1 font-medium text-slate-800">{name}</span>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => navigate(`/collection/${encodeURIComponent(name)}?mode=search`)}
-                    className="relative group p-2 rounded-md hover:bg-blue-50 text-slate-500 hover:text-blue-600 transition-colors"
-                    title="Search this collection"
-                  >
-                    <SearchIcon className="w-5 h-5" />
-                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-slate-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                      Search this collection
-                    </span>
-                  </button>
+                <button
+                  onClick={() => navigate(`/collection/${encodeURIComponent(name)}?mode=search`)}
+                  className="flex-1 px-2 py-2 text-left transition-all"
+                >
+                  <span className="block px-3 py-2 font-medium text-slate-800 rounded-md hover:bg-slate-100 hover:shadow-inner transition-all">
+                    {name}
+                  </span>
+                </button>
+                <div className="flex items-center gap-1 pr-2">
                   <button
                     onClick={() => navigate(`/collection/${encodeURIComponent(name)}?mode=add`)}
-                    className="relative group p-2 rounded-md hover:bg-green-50 text-slate-500 hover:text-green-600 transition-colors"
+                    className="p-2 rounded-md hover:bg-green-50 text-slate-500 hover:text-green-600 transition-colors"
                     title="Add to this collection"
                   >
                     <PlusIcon className="w-5 h-5" />
-                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-slate-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                      Add to this collection
-                    </span>
                   </button>
                   <button
                     onClick={() => handleDelete(name)}
                     disabled={deleting === name}
-                    className="relative group p-2 rounded-md hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                    className="p-2 rounded-md hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors disabled:opacity-50"
                     title="Delete collection"
                   >
                     <TrashIcon className="w-5 h-5" />
-                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-slate-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                      Delete collection
-                    </span>
                   </button>
                 </div>
               </li>
