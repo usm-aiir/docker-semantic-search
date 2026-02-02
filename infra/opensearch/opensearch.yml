@@ -1,0 +1,6 @@
+# OpenSearch configuration for single-node development
+cluster.name: semantic-search
+node.name: opensearch-node
+discovery.type: single-node
+bootstrap.memory_lock: true
+plugins.security.disabled: true

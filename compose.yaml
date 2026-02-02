@@ -1,0 +1,93 @@
+services:
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - plugins.security.disabled=true
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:9200 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    environment:
+      - OPENSEARCH_URL=${OPENSEARCH_URL:-http://opensearch:9200}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - SQLITE_PATH=${SQLITE_PATH:-/data/jobs.db}
+      - EMBED_MODEL=${EMBED_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      - MAX_UPLOAD_MB=${MAX_UPLOAD_MB:-50}
+    volumes:
+      - app_data:/data
+      - uploads:/tmp/uploads
+    depends_on:
+      opensearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/worker.Dockerfile
+    environment:
+      - OPENSEARCH_URL=${OPENSEARCH_URL:-http://opensearch:9200}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - SQLITE_PATH=${SQLITE_PATH:-/data/jobs.db}
+      - EMBED_MODEL=${EMBED_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+    volumes:
+      - app_data:/data
+      - uploads:/tmp/uploads
+    depends_on:
+      opensearch:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    networks:
+      - app
+
+volumes:
+  opensearch_data:
+  app_data:
+  uploads:
+
+networks:
+  app:
+    driver: bridge

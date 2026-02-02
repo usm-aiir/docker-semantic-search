@@ -1,0 +1,6 @@
+id	title	text	category
+doc-1	Getting started with semantic search	Semantic search uses embeddings to find documents by meaning, not just keywords. You upload documents, the system chunks and embeds them, then queries are embedded and matched against the index.	docs
+doc-2	Docker and containers	Docker runs your app in containers. Use docker compose to start the API, worker, and OpenSearch. The run script detects docker compose vs docker-compose for you.	infra
+doc-3	Supported upload formats	Upload CSV, TSV, JSON, or JSONL files. JSON can be an array of objects or a single object. JSONL is one JSON object per line.	docs
+doc-4	Embeddings and chunking	The worker uses sentence-transformers to create embeddings. Long text is split into chunks so each chunk fits the model. You choose which fields to index as searchable text.	docs
+doc-5	OpenSearch and indexing	OpenSearch stores the vector index. Documents are indexed with dense vectors for similarity search. The search API returns ranked results with scores.	infra

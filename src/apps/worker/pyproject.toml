@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "semantic-search-worker"
+version = "1.0.0"
+description = "Background worker for semantic search indexing"
+requires-python = ">=3.11"
+dependencies = [
+    "redis>=5.0.0",
+    "rq>=1.15.0",
+    "structlog>=24.1.0",
+    "semantic-search-core",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/semantic_search_worker"]
