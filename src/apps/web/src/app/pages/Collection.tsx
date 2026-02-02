@@ -5,13 +5,16 @@ import {
   createIndexJob,
   getJobStatus,
   search as apiSearch,
+  chat as apiChat,
   type PreviewResponse,
   type SearchResult,
+  type ChatResponse,
 } from "../api";
 import DocumentModal from "../components/DocumentModal";
 import { useJobs } from "../context/JobsContext";
 
 type WizardStep = "upload" | "configure" | "indexing" | "search";
+type SearchTab = "search" | "chat";
 
 export default function Collection() {
   const { name } = useParams<{ name: string }>();
@@ -36,6 +39,12 @@ export default function Collection() {
   const [selectedDoc, setSelectedDoc] = useState<SearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  
+  // Chat state
+  const [searchTab, setSearchTab] = useState<SearchTab>("search");
+  const [chatQuestion, setChatQuestion] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatHistory, setChatHistory] = useState<Array<{ question: string; response: ChatResponse }>>([]);
 
   useEffect(() => {
     if (!collectionName) navigate("/");
@@ -126,6 +135,21 @@ export default function Collection() {
       setError(err instanceof Error ? err.message : "Search failed");
     } finally {
       setSearching(false);
+    }
+  };
+
+  const doChat = async () => {
+    if (!collectionName || !chatQuestion.trim()) return;
+    setChatLoading(true);
+    setError(null);
+    try {
+      const response = await apiChat(collectionName, chatQuestion.trim(), 5);
+      setChatHistory((prev) => [...prev, { question: chatQuestion.trim(), response }]);
+      setChatQuestion("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Chat failed");
+    } finally {
+      setChatLoading(false);
     }
   };
 
@@ -331,48 +355,160 @@ export default function Collection() {
         )}
 
         {step === "search" && (
-          <div className="bg-white border border-slate-200 rounded-lg p-6">
-            <h2 className="text-lg font-medium text-slate-800 mb-4">Search</h2>
-            <div className="flex gap-2 mb-6">
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && doSearch()}
-                placeholder="Enter search query..."
-                className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500"
-              />
+          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            {/* Tabs */}
+            <div className="flex border-b border-slate-200">
               <button
-                onClick={doSearch}
-                disabled={searching}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                onClick={() => setSearchTab("search")}
+                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                  searchTab === "search"
+                    ? "bg-white text-blue-600 border-b-2 border-blue-600"
+                    : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+                }`}
               >
                 Search
               </button>
+              <button
+                onClick={() => setSearchTab("chat")}
+                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+                  searchTab === "chat"
+                    ? "bg-white text-blue-600 border-b-2 border-blue-600"
+                    : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Chat with Documents
+              </button>
             </div>
-            {results.length > 0 && (
-              <ul className="space-y-3">
-                {results.map((r, i) => (
-                  <li
-                    key={r.doc_id + i}
-                    onClick={() => setSelectedDoc(r)}
-                    className="p-4 border border-slate-200 rounded-md cursor-pointer hover:bg-slate-50"
-                  >
-                    <div className="font-medium text-slate-800">{r.title || r.doc_id}</div>
-                    <div className="text-sm text-slate-600 mt-1">{r.snippet}</div>
-                    {r.score != null && (
-                      <div className="text-xs text-slate-400 mt-1">Score: {r.score.toFixed(4)}</div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {results.length === 0 && query && !searching && (
-              <p className="text-slate-500">No results found.</p>
-            )}
-            {results.length === 0 && !query && (
-              <p className="text-slate-500">Enter a query to search this collection.</p>
-            )}
+
+            <div className="p-6">
+              {/* Search Tab */}
+              {searchTab === "search" && (
+                <>
+                  <p className="text-sm text-slate-500 mb-4">
+                    Find documents using hybrid search (combines keyword + semantic matching)
+                  </p>
+                  <div className="flex gap-2 mb-6">
+                    <input
+                      type="text"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && doSearch()}
+                      placeholder="Enter search query..."
+                      className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={doSearch}
+                      disabled={searching}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {searching ? "Searching..." : "Search"}
+                    </button>
+                  </div>
+                  {results.length > 0 && (
+                    <ul className="space-y-3">
+                      {results.map((r, i) => (
+                        <li
+                          key={r.doc_id + i}
+                          onClick={() => setSelectedDoc(r)}
+                          className="p-4 border border-slate-200 rounded-md cursor-pointer hover:bg-slate-50"
+                        >
+                          <div className="font-medium text-slate-800">{r.title || r.doc_id}</div>
+                          <div className="text-sm text-slate-600 mt-1">{r.snippet}</div>
+                          {r.score != null && (
+                            <div className="text-xs text-slate-400 mt-1">Score: {r.score.toFixed(4)}</div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {results.length === 0 && query && !searching && (
+                    <p className="text-slate-500">No results found.</p>
+                  )}
+                  {results.length === 0 && !query && (
+                    <p className="text-slate-500">Enter a query to search this collection.</p>
+                  )}
+                </>
+              )}
+
+              {/* Chat Tab */}
+              {searchTab === "chat" && (
+                <>
+                  <p className="text-sm text-slate-500 mb-4">
+                    Ask questions and get AI-generated answers based on your documents
+                  </p>
+                  
+                  {/* Chat History */}
+                  {chatHistory.length > 0 && (
+                    <div className="mb-6 space-y-4 max-h-96 overflow-y-auto">
+                      {chatHistory.map((item, i) => (
+                        <div key={i} className="space-y-2">
+                          <div className="flex gap-2">
+                            <span className="text-blue-600 font-medium">Q:</span>
+                            <span className="text-slate-700">{item.question}</span>
+                          </div>
+                          <div className="bg-slate-50 rounded-lg p-4">
+                            <div className="text-slate-800 whitespace-pre-wrap">{item.response.answer}</div>
+                            {item.response.sources.length > 0 && (
+                              <div className="mt-3 pt-3 border-t border-slate-200">
+                                <p className="text-xs text-slate-500 mb-2">Sources:</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {item.response.sources.map((src, j) => (
+                                    <span
+                                      key={j}
+                                      className="inline-block px-2 py-1 bg-slate-200 text-slate-600 text-xs rounded"
+                                    >
+                                      {src.title || src.doc_id}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            <div className="mt-2 text-xs text-slate-400">
+                              Model: {item.response.model}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Chat Input */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={chatQuestion}
+                      onChange={(e) => setChatQuestion(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && !chatLoading && doChat()}
+                      placeholder="Ask a question about your documents..."
+                      className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                      disabled={chatLoading}
+                    />
+                    <button
+                      onClick={doChat}
+                      disabled={chatLoading || !chatQuestion.trim()}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {chatLoading ? "Thinking..." : "Ask"}
+                    </button>
+                  </div>
+
+                  {chatHistory.length === 0 && !chatLoading && (
+                    <p className="mt-4 text-slate-500 text-sm">
+                      Ask a question and the AI will answer based on the documents in this collection.
+                    </p>
+                  )}
+
+                  {chatHistory.length > 0 && (
+                    <button
+                      onClick={() => setChatHistory([])}
+                      className="mt-4 text-sm text-slate-500 hover:text-slate-700"
+                    >
+                      Clear chat history
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         )}
       </main>

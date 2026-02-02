@@ -8,7 +8,11 @@ from semantic_search_core.search.opensearch.index import (
     build_doc,
     safe_index_name,
 )
-from semantic_search_core.search.opensearch.query import search_knn
+from semantic_search_core.search.opensearch.query import (
+    search_knn,
+    search_bm25,
+    search_hybrid,
+)
 
 __all__ = [
     "get_client",
@@ -19,4 +23,6 @@ __all__ = [
     "build_doc",
     "safe_index_name",
     "search_knn",
+    "search_bm25",
+    "search_hybrid",
 ]

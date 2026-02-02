@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from semantic_search_api.logging import configure_logging
-from semantic_search_api.routers import health, collections, uploads, jobs, search
+from semantic_search_api.routers import health, collections, uploads, jobs, search, chat
 from semantic_search_core.jobs import init_db
 
 configure_logging()
@@ -24,6 +24,7 @@ app.include_router(collections.router, prefix="/api")
 app.include_router(uploads.router, prefix="/api")
 app.include_router(jobs.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
 
 
 @app.on_event("startup")

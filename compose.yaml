@@ -41,6 +41,12 @@ services:
       - SQLITE_PATH=${SQLITE_PATH:-/data/jobs.db}
       - EMBED_MODEL=${EMBED_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
       - MAX_UPLOAD_MB=${MAX_UPLOAD_MB:-50}
+      # LLM Configuration for RAG Chat
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
     volumes:
       - app_data:/data
       - uploads:/tmp/uploads

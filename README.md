@@ -1,6 +1,13 @@
 # Semantic Search
 
-A self-hosted semantic search application. Upload your data files, index them with vector embeddings, and search using natural language.
+A self-hosted semantic search application. Upload your data files, index them with vector embeddings, and search using natural language. Includes hybrid search (BM25 + vectors) and RAG-powered chat with your documents.
+
+## Features
+
+- **Hybrid Search** - Combines BM25 keyword search with semantic vector search using Reciprocal Rank Fusion (RRF)
+- **RAG Chat** - Ask questions and get AI-generated answers based on your documents (supports Gemini API and Ollama)
+- **Multiple File Formats** - CSV, TSV, JSON, JSONL
+- **Background Indexing** - Upload large files without blocking
 
 ## Quickstart
 
@@ -21,10 +28,11 @@ A self-hosted semantic search application. Upload your data files, index them wi
 4. **Upload and search**
 
    - Create a collection
+   - Click the **+** icon to add documents
    - Drag and drop a `.csv`, `.tsv`, `.json`, or `.jsonl` file
    - Select which fields contain text content
    - Start indexing
-   - Search your documents
+   - Click the **search** icon to search or chat with your documents
 
 ## Supported File Formats
 
@@ -37,10 +45,36 @@ A self-hosted semantic search application. Upload your data files, index them wi
 
 Copy `.env.example` to `.env` to customize settings:
 
+### Core Settings
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `EMBED_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | Embedding model |
 | `MAX_UPLOAD_MB` | `50` | Maximum upload size |
+
+### LLM Configuration (for RAG Chat)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LLM_PROVIDER` | `gemini` | LLM provider: `gemini` or `ollama` |
+| `GEMINI_API_KEY` | - | Your Google Gemini API key |
+| `GEMINI_MODEL` | `gemini-2.0-flash` | Gemini model to use |
+| `OLLAMA_URL` | `http://ollama:11434` | Ollama server URL |
+| `OLLAMA_MODEL` | `llama3.2` | Ollama model to use |
+
+### Setting up Chat
+
+**Option 1: Google Gemini (Recommended for quick start)**
+
+1. Get a free API key from [Google AI Studio](https://aistudio.google.com/apikey)
+2. Create `.env` file: `cp .env.example .env`
+3. Set `GEMINI_API_KEY=your-key-here`
+
+**Option 2: Ollama (Local, private)**
+
+1. Set `LLM_PROVIDER=ollama` in your `.env`
+2. Add Ollama to your `docker-compose.yml` or run it externally
+3. Pull a model: `ollama pull llama3.2`
 
 ## Troubleshooting
 

@@ -118,16 +118,60 @@ export async function search(
   collection_name: string,
   query: string,
   k = 10,
-  filters?: Record<string, string | number | boolean>
+  filters?: Record<string, string | number | boolean>,
+  mode: "vector" | "bm25" | "hybrid" = "hybrid"
 ): Promise<SearchResult[]> {
   const r = await fetch(`${API}/search`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ collection_name, query, k, filters }),
+    body: JSON.stringify({ collection_name, query, k, filters, mode }),
   });
   if (!r.ok) {
     const d = await r.json().catch(() => ({}));
     throw new Error(d.detail || "Search failed");
   }
+  return r.json();
+}
+
+export interface ChatSource {
+  doc_id: string;
+  title: string;
+  snippet: string;
+}
+
+export interface ChatResponse {
+  answer: string;
+  sources: ChatSource[];
+  model: string;
+}
+
+export async function chat(
+  collection_name: string,
+  question: string,
+  k = 5,
+  filters?: Record<string, string | number | boolean>
+): Promise<ChatResponse> {
+  const r = await fetch(`${API}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ collection_name, question, k, filters }),
+  });
+  if (!r.ok) {
+    const d = await r.json().catch(() => ({}));
+    throw new Error(d.detail || "Chat failed");
+  }
+  return r.json();
+}
+
+export interface ChatConfig {
+  provider: string;
+  model: string;
+  gemini_configured: boolean;
+  ollama_url: string | null;
+}
+
+export async function getChatConfig(): Promise<ChatConfig> {
+  const r = await fetch(`${API}/chat/config`);
+  if (!r.ok) throw new Error("Failed to get chat config");
   return r.json();
 }
