@@ -72,9 +72,9 @@ Copy `.env.example` to `.env` to customize settings:
 
 **Option 2: Ollama (Local, private)**
 
-1. Set `LLM_PROVIDER=ollama` in your `.env`
-2. Add Ollama to your `docker-compose.yml` or run it externally
-3. Pull a model: `ollama pull llama3.2`
+1. Install Ollama from [ollama.ai](https://ollama.ai)
+2. Pull a model: `ollama pull llama3.2`
+3. Set `LLM_PROVIDER=ollama` in your `.env`
 
 ## Troubleshooting
 

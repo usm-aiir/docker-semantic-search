@@ -139,9 +139,21 @@ export interface ChatSource {
   snippet: string;
 }
 
+export interface ChatContext {
+  doc_id: string;
+  title: string;
+  body: string;
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface ChatResponse {
   answer: string;
   sources: ChatSource[];
+  context: ChatContext[];  // Context to reuse for follow-up questions
   model: string;
 }
 
@@ -149,12 +161,21 @@ export async function chat(
   collection_name: string,
   question: string,
   k = 5,
-  filters?: Record<string, string | number | boolean>
+  filters?: Record<string, string | number | boolean>,
+  history?: ChatMessage[],
+  context?: ChatContext[]  // Pass context from previous response for follow-ups
 ): Promise<ChatResponse> {
   const r = await fetch(`${API}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ collection_name, question, k, filters }),
+    body: JSON.stringify({ 
+      collection_name, 
+      question, 
+      k, 
+      filters, 
+      history: history || [],
+      context: context || null
+    }),
   });
   if (!r.ok) {
     const d = await r.json().catch(() => ({}));

@@ -9,6 +9,8 @@ import {
   type PreviewResponse,
   type SearchResult,
   type ChatResponse,
+  type ChatMessage,
+  type ChatContext,
 } from "../api";
 import DocumentModal from "../components/DocumentModal";
 import { useJobs } from "../context/JobsContext";
@@ -61,6 +63,7 @@ export default function Collection() {
   const [chatLoading, setChatLoading] = useState(false);
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null); // Question currently being processed
   const [chatHistory, setChatHistory] = useState<Array<{ question: string; response: ChatResponse }>>([]);
+  const [chatContext, setChatContext] = useState<ChatContext[] | null>(null); // Reusable context for follow-ups
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -171,7 +174,20 @@ export default function Collection() {
     setError(null);
     
     try {
-      const response = await apiChat(collectionName, q, 5);
+      // Build conversation history for context
+      const history: ChatMessage[] = chatHistory.flatMap((item) => [
+        { role: "user" as const, content: item.question },
+        { role: "assistant" as const, content: item.response.answer },
+      ]);
+      
+      // Pass context for follow-up questions (reuse same documents)
+      const response = await apiChat(collectionName, q, 5, undefined, history, chatContext || undefined);
+      
+      // Store context from first response for subsequent follow-ups
+      if (!chatContext && response.context) {
+        setChatContext(response.context);
+      }
+      
       setChatHistory((prev) => [...prev, { question: q, response }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Chat failed");
@@ -193,8 +209,9 @@ export default function Collection() {
       return;
     }
     
-    // New query - clear history and send to chat
+    // New query - clear history and context, then send to chat
     setChatHistory([]);
+    setChatContext(null);  // Clear context so new documents are fetched
     setChatQuery(query.trim());
     setChatOpen(true);
     // Send the search query as the first chat message
@@ -483,7 +500,22 @@ export default function Collection() {
                     </ul>
                   )}
                   {results.length === 0 && query && !searching && (
-                    <p className="text-slate-500 p-4">No results found.</p>
+                    <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                      <svg className="w-16 h-16 text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+                      </svg>
+                      <p className="text-slate-500 text-lg font-medium">No results found</p>
+                      <p className="text-slate-400 text-sm mt-1">Try a different search term</p>
+                    </div>
+                  )}
+                  {results.length === 0 && !query && !searching && !chatOpen && (
+                    <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                      <svg className="w-20 h-20 text-slate-200 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                      </svg>
+                      <p className="text-slate-400 text-lg">Search your documents</p>
+                      <p className="text-slate-300 text-sm mt-1">Enter a query above to get started</p>
+                    </div>
                   )}
                 </div>
               </div>
