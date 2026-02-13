@@ -14,6 +14,8 @@ import {
 } from "../api";
 import DocumentModal from "../components/DocumentModal";
 import { useJobs } from "../context/JobsContext";
+import { useSearchHistory } from "../hooks/useSearchHistory";
+import { exportChatAsJSON, exportChatAsMarkdown } from "../utils/exportChat";
 
 type WizardStep = "upload" | "configure" | "indexing" | "search";
 
@@ -28,6 +30,20 @@ const SparklesIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
 const XIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+  </svg>
+);
+
+// Clock icon for history
+const ClockIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+  </svg>
+);
+
+// Download icon for export
+const DownloadIcon = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
   </svg>
 );
 
@@ -65,10 +81,33 @@ export default function Collection() {
   const [chatHistory, setChatHistory] = useState<Array<{ question: string; response: ChatResponse }>>([]);
   const [chatContext, setChatContext] = useState<ChatContext[] | null>(null); // Reusable context for follow-ups
   const chatEndRef = useRef<HTMLDivElement>(null);
+  
+  // Search history
+  const { addSearch, getCollectionHistory, removeEntry } = useSearchHistory(collectionName);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const historyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!collectionName) navigate("/");
   }, [collectionName, navigate]);
+  
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (historyRef.current && !historyRef.current.contains(e.target as Node)) {
+        setShowHistory(false);
+      }
+      // Close export menu if clicking outside
+      const exportBtn = (e.target as Element)?.closest?.('[title="Export conversation"]');
+      if (!exportBtn && !(e.target as Element)?.closest?.('.export-menu')) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
@@ -144,14 +183,19 @@ export default function Collection() {
     }, 1500);
   };
 
-  const doSearch = async () => {
-    if (!collectionName || !query.trim()) return;
+  const doSearch = async (searchQuery?: string) => {
+    const q = searchQuery || query.trim();
+    if (!collectionName || !q) return;
     setSearching(true);
     setError(null);
     setShowAiButton(false); // Hide button while searching
+    setShowHistory(false); // Close history dropdown
+    if (searchQuery) setQuery(searchQuery); // Update input if search came from history
     try {
-      const list = await apiSearch(collectionName, query.trim(), 10);
+      const list = await apiSearch(collectionName, q, 10);
       setResults(list);
+      // Add to search history
+      addSearch(q, list.length);
       // Animate the AI button in after a brief delay
       if (list.length > 0) {
         setTimeout(() => setShowAiButton(true), 300);
@@ -455,17 +499,67 @@ export default function Collection() {
               <div className={`border-b border-slate-200 transition-all duration-500 ease-in-out flex-shrink-0 ${
                 chatOpen ? "max-h-0 opacity-0 overflow-hidden p-0 border-b-0" : "max-h-20 opacity-100 p-4"
               }`}>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && doSearch()}
-                    placeholder="What are you looking for?"
-                    className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
+                <div className="flex gap-2 relative" ref={historyRef}>
+                  <div className="flex-1 relative">
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && doSearch()}
+                      onFocus={() => getCollectionHistory(10).length > 0 && setShowHistory(true)}
+                      placeholder="What are you looking for?"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    {/* History button */}
+                    {getCollectionHistory(1).length > 0 && (
+                      <button
+                        onClick={() => setShowHistory(!showHistory)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                        title="Search history"
+                      >
+                        <ClockIcon className="w-4 h-4" />
+                      </button>
+                    )}
+                    {/* History Dropdown */}
+                    {showHistory && getCollectionHistory(10).length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+                        <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between">
+                          <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Recent Searches</span>
+                        </div>
+                        <ul>
+                          {getCollectionHistory(10).map((entry) => (
+                            <li
+                              key={entry.id}
+                              className="group flex items-center justify-between px-3 py-2 hover:bg-slate-50 cursor-pointer"
+                            >
+                              <button
+                                onClick={() => doSearch(entry.query)}
+                                className="flex-1 text-left text-sm text-slate-700 truncate"
+                              >
+                                {entry.query}
+                                {entry.resultCount !== undefined && (
+                                  <span className="ml-2 text-xs text-slate-400">({entry.resultCount} results)</span>
+                                )}
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  removeEntry(entry.id);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 transition-all"
+                                title="Remove from history"
+                              >
+                                <XIcon className="w-3 h-3" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                   <button
-                    onClick={doSearch}
+                    onClick={() => doSearch()}
                     disabled={searching}
                     className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
                   >
@@ -541,13 +635,49 @@ export default function Collection() {
                       <SparklesIcon className="w-5 h-5 text-purple-600" />
                       <span className="font-medium text-slate-800">AI Chat</span>
                     </div>
-                    <button
-                      onClick={closeChat}
-                      className="p-1 rounded-md hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors"
-                      title="Close chat"
-                    >
-                      <XIcon className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {/* Export Button */}
+                      {chatHistory.length > 0 && (
+                        <div className="relative">
+                          <button
+                            onClick={() => setShowExportMenu(!showExportMenu)}
+                            className="p-1 rounded-md hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors"
+                            title="Export conversation"
+                          >
+                            <DownloadIcon className="w-5 h-5" />
+                          </button>
+                          {showExportMenu && (
+                            <div className="export-menu absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 min-w-[160px]">
+                              <button
+                                onClick={() => {
+                                  exportChatAsJSON(collectionName, chatQuery, chatHistory);
+                                  setShowExportMenu(false);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 rounded-t-lg"
+                              >
+                                Export as JSON
+                              </button>
+                              <button
+                                onClick={() => {
+                                  exportChatAsMarkdown(collectionName, chatQuery, chatHistory);
+                                  setShowExportMenu(false);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 rounded-b-lg"
+                              >
+                                Export as Markdown
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <button
+                        onClick={closeChat}
+                        className="p-1 rounded-md hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors"
+                        title="Close chat"
+                      >
+                        <XIcon className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Chat Messages - fills remaining space */}
@@ -568,14 +698,45 @@ export default function Collection() {
                               <div className="mt-3 pt-2 border-t border-slate-200">
                                 <p className="text-xs text-slate-500 mb-1">Sources:</p>
                                 <div className="flex flex-wrap gap-1">
-                                  {item.response.sources.map((src, j) => (
-                                    <span
-                                      key={j}
-                                      className="inline-block px-2 py-0.5 bg-slate-200 text-slate-600 text-xs rounded"
-                                    >
-                                      {src.title || src.doc_id}
-                                    </span>
-                                  ))}
+                                  {item.response.sources.map((src, j) => {
+                                    // Find matching search result or context doc for full document view
+                                    const matchingResult = results.find(r => r.doc_id === src.doc_id);
+                                    const contextDoc = chatContext?.find(c => c.doc_id === src.doc_id);
+                                    
+                                    const handleClick = () => {
+                                      if (matchingResult) {
+                                        setSelectedDoc(matchingResult);
+                                      } else if (contextDoc) {
+                                        // Create a SearchResult-like object from context
+                                        setSelectedDoc({
+                                          doc_id: contextDoc.doc_id,
+                                          title: contextDoc.title,
+                                          snippet: contextDoc.body.slice(0, 200) + "...",
+                                          body: contextDoc.body,
+                                          metadata: {},
+                                          score: null,
+                                        });
+                                      }
+                                    };
+                                    
+                                    const isClickable = matchingResult || contextDoc;
+                                    
+                                    return (
+                                      <button
+                                        key={j}
+                                        onClick={handleClick}
+                                        disabled={!isClickable}
+                                        className={`inline-block px-2 py-0.5 text-xs rounded transition-colors ${
+                                          isClickable 
+                                            ? "bg-blue-100 text-blue-700 hover:bg-blue-200 cursor-pointer" 
+                                            : "bg-slate-200 text-slate-600 cursor-default"
+                                        }`}
+                                        title={isClickable ? "View document" : src.title || src.doc_id}
+                                      >
+                                        {src.title || src.doc_id}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             )}
